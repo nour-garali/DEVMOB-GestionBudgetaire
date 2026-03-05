@@ -2,27 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui';
 import '../../providers/auth_provider.dart';
-import 'login_page.dart';
+import 'register_page.dart';
 import '../../widgets/budget_logo.dart';
 
-class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
 
   @override
-  State<RegisterPage> createState() => _RegisterPageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-class _RegisterPageState extends State<RegisterPage>
-    with SingleTickerProviderStateMixin {
+class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
 
   bool _showPassword = false;
-  bool _showConfirmPassword = false;
-
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -49,29 +44,16 @@ class _RegisterPageState extends State<RegisterPage>
   @override
   void dispose() {
     _animationController.dispose();
-    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleSignUp() async {
+  Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('❌ Les mots de passe ne correspondent pas'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
-
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final success = await authProvider.signUp(
-      name: _nameController.text.trim(),
+    final success = await authProvider.signIn(
       email: _emailController.text.trim(),
       password: _passwordController.text.trim(),
     );
@@ -79,7 +61,7 @@ class _RegisterPageState extends State<RegisterPage>
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('✅ Compte créé avec succès !'),
+          content: const Text('✅ Connexion réussie !'),
           backgroundColor: const Color(0xFF10B981),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -100,9 +82,9 @@ class _RegisterPageState extends State<RegisterPage>
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Color(0xFFF0FDF4), // green-50
-                  Color(0xFFEFF6FF), // blue-50
-                  Color(0xFFECFDF5), // emerald-50
+                  Color(0xFFF0FDF4),
+                  Color(0xFFEFF6FF),
+                  Color(0xFFECFDF5),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -112,13 +94,13 @@ class _RegisterPageState extends State<RegisterPage>
 
           // --- Decorative Shapes ---
           Positioned(
-            top: 60,
-            left: 20,
+            top: 80,
+            left: 40,
             child: _buildDecorativeShape(128, const Color(0xFFBBF7D0).withValues(alpha: 0.2)),
           ),
           Positioned(
             bottom: 80,
-            right: 20,
+            right: 40,
             child: _buildDecorativeShape(160, const Color(0xFFBFDBFE).withValues(alpha: 0.2)),
           ),
           Center(
@@ -137,18 +119,13 @@ class _RegisterPageState extends State<RegisterPage>
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Space for centering adjust
                         const SizedBox(height: 20),
-                        
-                        // Card with shadow
                         Stack(
                           alignment: Alignment.bottomCenter,
                           children: [
-                            // Bottom decoration blur
                             Container(
                               width: MediaQuery.of(context).size.width * 0.7,
                               height: 20,
-                              margin: EdgeInsets.zero,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(100),
                                 boxShadow: [
@@ -160,8 +137,6 @@ class _RegisterPageState extends State<RegisterPage>
                                 ],
                               ),
                             ),
-                            
-                            // Main Card
                             Container(
                               width: double.infinity,
                               constraints: const BoxConstraints(maxWidth: 400),
@@ -182,12 +157,10 @@ class _RegisterPageState extends State<RegisterPage>
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    // Logo
                                     const BudgetLogo(),
                                     const SizedBox(height: 32),
-
                                     const Text(
-                                      'Inscription',
+                                      'Connexion',
                                       style: TextStyle(
                                         color: Color(0xFF1F2937),
                                         fontSize: 30,
@@ -195,17 +168,6 @@ class _RegisterPageState extends State<RegisterPage>
                                       ),
                                     ),
                                     const SizedBox(height: 32),
-
-                                    // Fields
-                                    _buildField(
-                                      controller: _nameController,
-                                      label: 'Nom complet',
-                                      hint: 'Jean Dupont',
-                                      icon: Icons.person_outline_rounded,
-                                      validator: (val) => val!.isEmpty ? 'Veuillez entrer votre nom' : null,
-                                    ),
-                                    const SizedBox(height: 20),
-
                                     _buildField(
                                       controller: _emailController,
                                       label: 'Adresse e-mail',
@@ -219,7 +181,6 @@ class _RegisterPageState extends State<RegisterPage>
                                       },
                                     ),
                                     const SizedBox(height: 20),
-
                                     _buildField(
                                       controller: _passwordController,
                                       label: 'Mot de passe',
@@ -228,21 +189,22 @@ class _RegisterPageState extends State<RegisterPage>
                                       isPassword: true,
                                       showPassword: _showPassword,
                                       onToggleVisibility: () => setState(() => _showPassword = !_showPassword),
-                                      validator: (val) => val!.length < 6 ? 'Minimum 6 caractères' : null,
+                                      validator: (val) => val!.isEmpty ? 'Veuillez entrer votre mot de passe' : null,
                                     ),
-                                    const SizedBox(height: 20),
-
-                                    _buildField(
-                                      controller: _confirmPasswordController,
-                                      label: 'Confirmation du mot de passe',
-                                      hint: '••••••••',
-                                      icon: Icons.lock_outline_rounded,
-                                      isPassword: true,
-                                      showPassword: _showConfirmPassword,
-                                      onToggleVisibility: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
-                                      validator: (val) => val!.isEmpty ? 'Veuillez confirmer' : null,
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: TextButton(
+                                        onPressed: () {},
+                                        child: const Text(
+                                          'Mot de passe oublié ?',
+                                          style: TextStyle(
+                                            color: Color(0xFF10B981),
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
                                     ),
-
                                     if (authProvider.errorMessage != null) ...[
                                       const SizedBox(height: 16),
                                       Text(
@@ -251,31 +213,25 @@ class _RegisterPageState extends State<RegisterPage>
                                         textAlign: TextAlign.center,
                                       ),
                                     ],
-
-                                    const SizedBox(height: 36),
-
-                                    // Signup Button
-                                    _buildSubmitButton(authProvider),
-
                                     const SizedBox(height: 24),
-
-                                    // Login Link
+                                    _buildSubmitButton(authProvider),
+                                    const SizedBox(height: 24),
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
                                         const Text(
-                                          'Déjà un compte ? ',
+                                          'Pas encore de compte ? ',
                                           style: TextStyle(color: Color(0xFF4B5563), fontSize: 14),
                                         ),
                                         GestureDetector(
                                           onTap: () {
-                                            Navigator.pushReplacement(
+                                            Navigator.push(
                                               context,
-                                              MaterialPageRoute(builder: (context) => const LoginPage()),
+                                              MaterialPageRoute(builder: (context) => const RegisterPage()),
                                             );
                                           },
                                           child: const Text(
-                                            'Se connecter',
+                                            "S'inscrire",
                                             style: TextStyle(
                                               color: Color(0xFF10B981),
                                               fontSize: 14,
@@ -318,7 +274,6 @@ class _RegisterPageState extends State<RegisterPage>
       ),
     );
   }
-
 
   Widget _buildField({
     required TextEditingController controller,
@@ -371,7 +326,7 @@ class _RegisterPageState extends State<RegisterPage>
                   )
                 : null,
             filled: true,
-            fillColor: const Color(0xFFF9FAFB), // gray-50
+            fillColor: const Color(0xFFF9FAFB),
             contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
@@ -383,7 +338,7 @@ class _RegisterPageState extends State<RegisterPage>
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0xFF6EE7B7), width: 2), // emerald-300 ring
+              borderSide: const BorderSide(color: Color(0xFF6EE7B7), width: 2),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
@@ -417,7 +372,7 @@ class _RegisterPageState extends State<RegisterPage>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: authProvider.isLoading ? null : _handleSignUp,
+          onTap: authProvider.isLoading ? null : _handleLogin,
           borderRadius: BorderRadius.circular(16),
           child: Center(
             child: authProvider.isLoading
@@ -427,7 +382,7 @@ class _RegisterPageState extends State<RegisterPage>
                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                   )
                 : const Text(
-                    "S'inscrire",
+                    "Se connecter",
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
