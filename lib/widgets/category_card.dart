@@ -132,7 +132,9 @@ class CategoryCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '$prefix ${amount.toStringAsFixed(2)} DT',
+                            amount < 0 
+                                ? '•••• DT' 
+                                : '$prefix ${amount.toStringAsFixed(2)} DT',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
