@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../models/Transaction.dart';
 import 'add_transaction_page.dart';
 import '../../providers/BudgetProvider.dart';
+import '../../providers/settings_provider.dart';
 
 class ListTransactions extends StatefulWidget {
   const ListTransactions({super.key});
@@ -53,7 +54,9 @@ class _ListTransactionsState extends State<ListTransactions>
   Widget build(BuildContext context) {
     final transactionProvider = Provider.of<TransactionProvider>(context);
     final goalProvider = Provider.of<BudgetGoalProvider>(context);
+    final settingsProvider = Provider.of<SettingsProvider>(context);
     final transactions = transactionProvider.transactions;
+    final bool hideBal = settingsProvider.hideBalances;
 
     // Calculate total budget from goals for selected month
     final baseDate = _filterDate ?? DateTime.now();
@@ -92,7 +95,7 @@ class _ListTransactionsState extends State<ListTransactions>
                             _buildMonthNavigator(),
                             const SizedBox(height: 10),
                             _buildExpenseCircle(
-                                monthlyExpenseTotal, totalGoalBudget),
+                                monthlyExpenseTotal, totalGoalBudget, hideBal),
                             const SizedBox(height: 3),
                           ],
                         ),
@@ -147,6 +150,7 @@ class _ListTransactionsState extends State<ListTransactions>
                         t.date.month == date.month;
                   }).toList(),
                   transactionProvider,
+                  hideBal,
                 ),
                 _buildCategorizedList(
                   transactions.where((t) {
@@ -157,6 +161,7 @@ class _ListTransactionsState extends State<ListTransactions>
                         t.date.month == date.month;
                   }).toList(),
                   transactionProvider,
+                  hideBal,
                 ),
               ],
             ),
@@ -334,12 +339,34 @@ class _ListTransactionsState extends State<ListTransactions>
     );
   }
 
-  Widget _buildExpenseCircle(double total, double budget) {
-final percent = budget > 0
-    ? ((total / budget) * 100).round()
-    : 0;
-    // Constant blue color for the circle
+  Widget _buildExpenseCircle(double total, double budget, bool hideBal) {
+    // Raw percentage — can exceed 100% if budget is surpassed
+    final rawPercent = budget > 0
+        ? ((total / budget) * 100).round()
+        : 0;
+    // Visual value clamped between 0 and 1 (for any progress indicator)
+    final visualProgress = budget > 0 ? (total / budget).clamp(0.0, 1.0) : 0.0;
     final Color circleColor = const Color(0xFF1644FF);
+
+    // Status message and color based on 4-tier logic
+    final String statusMessage;
+    final Color statusColor;
+    if (budget <= 0) {
+      statusMessage = 'Set a budget goal to track spending';
+      statusColor = const Color(0xFF94A3B8);
+    } else if (rawPercent > 100) {
+      statusMessage = 'Budget exceeded';
+      statusColor = const Color(0xFFDC2626);
+    } else if (rawPercent >= 80) {
+      statusMessage = 'Budget almost exceeded';
+      statusColor = const Color(0xFFF87171);
+    } else if (rawPercent >= 50) {
+      statusMessage = 'Be careful with spending';
+      statusColor = const Color(0xFFF59E0B);
+    } else {
+      statusMessage = 'Good spending control';
+      statusColor = const Color(0xFF16A34A);
+    }
 
     return Column(
       children: [
@@ -365,7 +392,9 @@ final percent = budget > 0
             ),
             child: Center(
               child: Text(
-                '\$${total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                hideBal 
+                  ? '****' 
+                  : '\$${total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -377,7 +406,7 @@ final percent = budget > 0
         ),
         const SizedBox(height: 10),
         Text(
-          '$percent% of budget used',
+          budget <= 0 ? 'No budget defined' : '${rawPercent.clamp(0, 100)}% of budget used',
           textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 12,
@@ -387,20 +416,12 @@ final percent = budget > 0
         ),
         const SizedBox(height: 4),
         Text(
-          percent < 50
-              ? 'Good spending control'
-              : percent < 80
-                  ? 'Be careful with spending'
-                  : 'Budget almost exceeded',
+          statusMessage,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w400,
-            color: percent < 50
-                ? const Color(0xFF16A34A)
-                : percent < 80
-                    ? const Color(0xFFF59E0B)
-                    : const Color(0xFFF87171),
+            color: statusColor,
           ),
         ),
       ],
@@ -498,20 +519,21 @@ final percent = budget > 0
   }
 
   Widget _buildFlatList(
-      List<Transaction> transactions, TransactionProvider provider) {
+      List<Transaction> transactions, TransactionProvider provider, bool hideBal) {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
       physics: const BouncingScrollPhysics(),
       itemCount: transactions.length,
       itemBuilder: (context, index) {
-        return _buildTransactionItem(transactions[index], provider);
+        return _buildTransactionItem(transactions[index], provider, hideBal);
       },
     );
   }
 
   Widget _buildCategorizedList(
     List<Transaction> transactions,
-    TransactionProvider provider, {
+    TransactionProvider provider,
+    bool hideBal, {
     bool shrinkWrap = false,
   }) {
     if (transactions.isEmpty) {
@@ -566,7 +588,7 @@ final percent = budget > 0
                 ),
               ),
             ),
-            ...txs.map((t) => _buildTransactionItem(t, provider)).toList(),
+            ...txs.map((t) => _buildTransactionItem(t, provider, hideBal)).toList(),
           ],
         );
       },
@@ -574,47 +596,74 @@ final percent = budget > 0
   }
 
   Widget _buildTransactionItem(
-      Transaction transaction, TransactionProvider provider) {
+      Transaction transaction, TransactionProvider provider, bool hideBal) {
     final isIncome = transaction.type == 'income';
     final categoryName = provider.getCategoryName(transaction.categoryId);
     final categoryIcon = provider.getCategoryIcon(transaction.categoryId);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(16),
+    return InkWell(
+      onLongPress: () => _showTransactionOptions(context, transaction, provider),
+      onTap: () => _showTransactionOptions(context, transaction, provider),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                categoryIcon,
+                color: const Color(0xFF1E283D),
+                size: 24,
+              ),
             ),
-            child: Icon(
-              categoryIcon,
-              color: const Color(0xFF1E283D),
-              size: 24,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    transaction.description?.isNotEmpty == true
+                        ? transaction.description!
+                        : categoryName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E283D),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    DateFormat('dd MMM yyyy').format(transaction.date),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  transaction.description?.isNotEmpty == true
-                      ? transaction.description!
-                      : categoryName,
+                  hideBal
+                      ? '****'
+                      : '${isIncome ? "+" : "-"} \$${transaction.amount.toStringAsFixed(0)}',
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF1E283D),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  DateFormat('dd MMM yyyy').format(transaction.date),
+                  categoryName,
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -623,27 +672,86 @@ final percent = budget > 0
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+  void _showTransactionOptions(BuildContext context, Transaction tx, TransactionProvider provider) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(30),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined, color: Color(0xFF64748B)),
+              title: const Text('Edit Transaction', style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => AddTransactionPage(transaction: tx)),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
+              title: const Text('Delete Transaction', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFEF4444))),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteConfirmation(context, tx, provider);
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, Transaction tx, TransactionProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Transaction', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('Are you sure you want to delete this transaction?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${isIncome ? "+" : "-"} \$${transaction.amount.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1E283D),
-                ),
-              ),
-              Text(
-                categoryName,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF94A3B8),
-                ),
-              ),
-            ],
+          ElevatedButton(
+            onPressed: () {
+              provider.deleteTransaction(tx.id);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Transaction deleted')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Delete'),
           ),
         ],
       ),

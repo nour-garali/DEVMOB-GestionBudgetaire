@@ -9,7 +9,8 @@ import 'package:intl/intl.dart';
 import '../category/create_category_page.dart';
 
 class AddTransactionPage extends StatefulWidget {
-  const AddTransactionPage({super.key});
+  final Transaction? transaction;
+  const AddTransactionPage({super.key, this.transaction});
 
   @override
   State<AddTransactionPage> createState() => _AddTransactionPageState();
@@ -23,6 +24,18 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
   DateTime _selectedDate = DateTime.now();
   Category? _selectedCategory;
   String _transactionType = 'expense'; // 'income' or 'expense'
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.transaction != null) {
+      _selectedDate = widget.transaction!.date;
+      _transactionType = widget.transaction!.type;
+      _amountController.text = widget.transaction!.amount.toStringAsFixed(0);
+      _descriptionController.text = widget.transaction!.description ?? '';
+      // Category will be pre-selected in build() once categories are available
+    }
+  }
 
   @override
   void dispose() {
@@ -75,11 +88,11 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
     if (userId == null) return;
 
     final amount = double.tryParse(_amountController.text) ?? 0.0;
+    final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
 
-    // Budget check logic for expenses
+    // Budget check logic for expenses (only if not editing or if amount increased)
     if (_transactionType == 'expense') {
       final savingsProvider = Provider.of<BudgetGoalProvider>(context, listen: false);
-      final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
 
       final matchingGoals = savingsProvider.goals.where(
         (g) => g.categoryId == _selectedCategory!.id && g.month == _selectedDate.month && g.year == _selectedDate.year,
@@ -94,7 +107,8 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
             _selectedDate.year,
           );
 
-          if (currentSpent + amount > goal.targetAmount) {
+          double oldAmount = widget.transaction?.amount ?? 0;
+          if (currentSpent - oldAmount + amount > goal.targetAmount) {
             final shouldContinue = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
@@ -123,8 +137,8 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
       }
     }
 
-    final transaction = Transaction(
-      id: '',
+    final txData = Transaction(
+      id: widget.transaction?.id ?? '',
       userId: userId,
       amount: amount,
       categoryId: _selectedCategory!.id,
@@ -134,7 +148,11 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
     );
 
     try {
-      await Provider.of<TransactionProvider>(context, listen: false).addTransaction(transaction);
+      if (widget.transaction != null) {
+        await transactionProvider.updateTransaction(txData);
+      } else {
+        await transactionProvider.addTransaction(txData);
+      }
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
@@ -153,6 +171,13 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
     final filteredCategories = transactionProvider.categories
         .where((c) => c.type == (isExpense ? CategoryType.expense : CategoryType.income))
         .toList();
+
+    // Pre-select category if editing
+    if (widget.transaction != null && _selectedCategory == null && filteredCategories.isNotEmpty) {
+      try {
+        _selectedCategory = filteredCategories.firstWhere((c) => c.id == widget.transaction!.categoryId);
+      } catch (_) {}
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FF),
@@ -178,8 +203,10 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
           ),
         ),
         title: Text(
-          isExpense ? 'Add Expense' : 'Add Income',
-          style: TextStyle(color: const Color(0xFF1E293B), fontWeight: FontWeight.bold, fontSize: 18),
+          widget.transaction != null 
+            ? (isExpense ? 'Edit Expense' : 'Edit Income')
+            : (isExpense ? 'Add Expense' : 'Add Income'),
+          style: const TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.bold, fontSize: 18),
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -555,8 +582,10 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         child: Text(
-          (_transactionType == 'expense' ? 'ADD EXPENSE' : 'ADD INCOME'),
-          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 18),
+          widget.transaction != null 
+            ? 'SAVE CHANGES' 
+            : (_transactionType == 'expense' ? 'ADD EXPENSE' : 'ADD INCOME'),
+          style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 18),
         ),
       ),
     );
