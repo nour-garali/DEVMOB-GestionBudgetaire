@@ -6,6 +6,8 @@ class User {
   final String email;
   final DateTime createdAt;
   final String? photoUrl;
+  final String? country;
+  final DateTime? dateOfBirth;
 
   User({
     required this.uid,
@@ -13,6 +15,8 @@ class User {
     required this.email,
     required this.createdAt,
     this.photoUrl,
+    this.country,
+    this.dateOfBirth,
   });
 
   factory User.fromMap(String uid, Map<String, dynamic> map) {
@@ -22,6 +26,8 @@ class User {
       email: map['email'] ?? '',
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       photoUrl: map['photoUrl'],
+      country: map['country'],
+      dateOfBirth: map['dateOfBirth'] != null ? (map['dateOfBirth'] as Timestamp).toDate() : null,
     );
   }
 
@@ -31,6 +37,8 @@ class User {
       'email': email,
       'createdAt': Timestamp.fromDate(createdAt),
       'photoUrl': photoUrl,
+      'country': country,
+      'dateOfBirth': dateOfBirth != null ? Timestamp.fromDate(dateOfBirth!) : null,
     };
   }
 }
