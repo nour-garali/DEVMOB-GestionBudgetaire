@@ -217,7 +217,7 @@ class _BudgetGoalPageState extends State<BudgetGoalPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     itemCount: goals.length,
                     itemBuilder: (context, index) {
-                      return _buildGoalCard(goals[index], txProvider);
+                      return _buildGoalCard(goals[index], txProvider, goalProvider);
                     },
                   ),
             ),
@@ -227,7 +227,7 @@ class _BudgetGoalPageState extends State<BudgetGoalPage> {
     );
   }
 
-  Widget _buildGoalCard(BudgetGoal goal, TransactionProvider txProvider) {
+  Widget _buildGoalCard(BudgetGoal goal, TransactionProvider txProvider, BudgetGoalProvider goalProvider) {
     // Get real-time spending from TransactionProvider
     final double spentAmount = txProvider.getCategoryTotalByMonth(
       goal.categoryId, 
@@ -277,13 +277,53 @@ class _BudgetGoalPageState extends State<BudgetGoalPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      goal.name,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1E293B),
+                    Expanded(
+                      child: Text(
+                        goal.name,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E293B),
+                        ),
                       ),
+                    ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, color: Color(0xFF94A3B8), size: 20),
+                      padding: EdgeInsets.zero,
+                      onSelected: (value) {
+                        if (value == 'edit') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AddGoalPage(goal: goal),
+                            ),
+                          );
+                        } else if (value == 'delete') {
+                          _showDeleteConfirmation(context, goal, goalProvider);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+                              SizedBox(width: 10),
+                              Text('Edit', style: TextStyle(fontSize: 14)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
+                              SizedBox(width: 10),
+                              Text('Delete', style: TextStyle(fontSize: 14, color: Color(0xFFEF4444))),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                     Text(
                       _monthName(goal.month),
@@ -505,6 +545,39 @@ class _BudgetGoalPageState extends State<BudgetGoalPage> {
           ),
         );
       },
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, BudgetGoal goal, BudgetGoalProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Goal', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to delete the goal for "${goal.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              provider.deleteGoal(goal.id);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Goal deleted successfully')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
 }

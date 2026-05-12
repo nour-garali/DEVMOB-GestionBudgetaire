@@ -9,7 +9,8 @@ import '../../providers/transaction_provider.dart';
 
 class AddGoalPage extends StatefulWidget {
   final DateTime? initialMonth;
-  const AddGoalPage({super.key, this.initialMonth});
+  final BudgetGoal? goal;
+  const AddGoalPage({super.key, this.initialMonth, this.goal});
 
   @override
   State<AddGoalPage> createState() => _AddGoalPageState();
@@ -27,8 +28,13 @@ class _AddGoalPageState extends State<AddGoalPage> {
   @override
   void initState() {
     super.initState();
-    // Default to September as requested before, OR the passed initialMonth
-    _selectedMonth = widget.initialMonth ?? DateTime(DateTime.now().year, 9);
+    if (widget.goal != null) {
+      _selectedMonth = DateTime(widget.goal!.year, widget.goal!.month);
+      _amountController.text = widget.goal!.targetAmount.toStringAsFixed(0);
+      // We will select the category in the build method once categories are loaded
+    } else {
+      _selectedMonth = widget.initialMonth ?? DateTime(DateTime.now().year, 9);
+    }
   }
 
   @override
@@ -51,17 +57,36 @@ class _AddGoalPageState extends State<AddGoalPage> {
     final userId = Provider.of<AuthProvider>(context, listen: false).user?.uid;
 
     if (amount > 0 && userId != null) {
-      await Provider.of<BudgetGoalProvider>(context, listen: false).addGoal(BudgetGoal(
-        id: '',
-        userId: userId,
-        name: _selectedCategory!.name,
-        categoryId: _selectedCategory!.id,
-        currentAmount: 0.0,
-        targetAmount: amount,
-        iconCode: _selectedCategory!.icon.codePoint,
-        month: _selectedMonth.month,
-        year: _selectedMonth.year,
-      ));
+      final goalProvider = Provider.of<BudgetGoalProvider>(context, listen: false);
+      
+      if (widget.goal != null) {
+        // Update existing goal
+        await goalProvider.updateGoal(BudgetGoal(
+          id: widget.goal!.id,
+          userId: userId,
+          name: _selectedCategory!.name,
+          categoryId: _selectedCategory!.id,
+          currentAmount: widget.goal!.currentAmount,
+          targetAmount: amount,
+          iconCode: _selectedCategory!.icon.codePoint,
+          month: _selectedMonth.month,
+          year: _selectedMonth.year,
+        ));
+      } else {
+        // Add new goal
+        await goalProvider.addGoal(BudgetGoal(
+          id: '',
+          userId: userId,
+          name: _selectedCategory!.name,
+          categoryId: _selectedCategory!.id,
+          currentAmount: 0.0,
+          targetAmount: amount,
+          iconCode: _selectedCategory!.icon.codePoint,
+          month: _selectedMonth.month,
+          year: _selectedMonth.year,
+        ));
+      }
+      
       if (mounted) Navigator.pop(context);
     }
   }
@@ -73,6 +98,15 @@ class _AddGoalPageState extends State<AddGoalPage> {
         .where((c) => c.type == CategoryType.expense)
         .where((c) => c.name.toLowerCase().contains(_searchQuery.toLowerCase()))
         .toList();
+
+    // Pre-select category if editing
+    if (widget.goal != null && _selectedCategory == null && expenseCategories.isNotEmpty) {
+      try {
+        _selectedCategory = expenseCategories.firstWhere((c) => c.id == widget.goal!.categoryId);
+      } catch (_) {
+        // Handle if category no longer exists
+      }
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -110,9 +144,9 @@ class _AddGoalPageState extends State<AddGoalPage> {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      const Text(
-                        'Add Goal',
-                        style: TextStyle(
+                      Text(
+                        widget.goal != null ? 'Edit Goal' : 'Add Goal',
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF1E293B),
