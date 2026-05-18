@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide User;
 import '../services/AuthService.dart';
 import '../services/secure_storage_service.dart';
@@ -103,6 +103,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> refreshUser() async {
+    final firebaseUser = _authService.currentUser;
+    if (firebaseUser != null) {
+      _user = await _authService.getUserProfile(firebaseUser.uid);
+      notifyListeners();
+    }
+  }
+
   Future<bool> sendPasswordResetEmail(String email) async {
     _isLoading = true;
     _errorMessage = null;
@@ -119,7 +127,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = "Une erreur est survenue: $e";
+      _errorMessage = 'Une erreur est survenue: $e';
       _isLoading = false;
       notifyListeners();
       return false;

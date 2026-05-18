@@ -5,6 +5,7 @@ import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/transaction_provider.dart';
 import 'providers/BudgetProvider.dart';
+import 'providers/settings_provider.dart';
 import 'views/splash_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -20,6 +21,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => TransactionProvider()),
         ChangeNotifierProvider(create: (_) => BudgetGoalProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
       child: const MyApp(),
     ),
@@ -31,17 +33,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Écouter les changements de thème
+    final settings = Provider.of<SettingsProvider>(context);
+
     return MaterialApp(
       title: 'DEVMOB - Gestion Budgétaire',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1644FF),
-          background: const Color(0xFFF8F9FF),
-        ),
-        textTheme: Theme.of(context).textTheme,
-      ),
+      theme: settings.getTheme(),
       home: const SplashScreen(),
     );
   }

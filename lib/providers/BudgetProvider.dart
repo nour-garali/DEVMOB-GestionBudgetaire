@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import '../models/BudgetGoal.dart';
 import '../services/BudgetService.dart';
 
@@ -27,7 +27,7 @@ class BudgetGoalProvider with ChangeNotifier {
     await _budgetService.updateBudgetGoal(goal);
   }
 
-  Future<void> deleteGoal(String userId, String goalId) async {
-    await _budgetService.deleteBudgetGoal(userId, goalId);
+  Future<void> deleteGoal(String goalId) async {
+    await _budgetService.deleteBudgetGoal(goalId);
   }
 }

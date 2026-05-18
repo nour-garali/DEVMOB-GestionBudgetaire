@@ -109,27 +109,47 @@ class TransactionProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  // CRUD wrappers
-  Future<void> addTransaction(Transaction transaction) => _transactionService.addTransaction(transaction);
-  Future<void> updateTransaction(Transaction transaction) => _transactionService.updateTransaction(transaction);
-  Future<void> deleteTransaction(String userId, String transactionId) => _transactionService.deleteTransaction(userId, transactionId);
+  // CRUD wrappers — optimistic local update then Firestore sync
+  Future<void> addTransaction(Transaction transaction) async {
+    await _transactionService.addTransaction(transaction);
+    // Stream will auto-update with the new id from Firestore
+  }
+
+  Future<void> updateTransaction(Transaction transaction) async {
+    // 1. Update locally for immediate UI response
+    final index = _transactions.indexWhere((t) => t.id == transaction.id);
+    if (index != -1) {
+      _transactions[index] = transaction;
+      notifyListeners();
+    }
+    // 2. Persist to Firestore (stream will confirm)
+    await _transactionService.updateTransaction(transaction);
+  }
+
+  Future<void> deleteTransaction(String transactionId) async {
+    // 1. Remove locally for immediate UI response
+    _transactions.removeWhere((t) => t.id == transactionId);
+    notifyListeners();
+    // 2. Persist to Firestore (stream will confirm)
+    await _transactionService.deleteTransaction(transactionId);
+  }
   
   Future<void> addCategory(Category category) => _budgetService.addCategory(category);
   Future<void> updateCategory(Category category) => _budgetService.updateCategory(category);
-  Future<void> deleteCategory(String userId, String categoryId) => _budgetService.deleteCategory(userId, categoryId);
+  Future<void> deleteCategory(String categoryId) => _budgetService.deleteCategory(categoryId);
 
-  Future<void> deleteAllCategories(String userId) async {
+  Future<void> deleteAllCategories() async {
     final ids = _categories.map((c) => c.id).toList();
     if (ids.isEmpty) return;
     
     // Set flag to true so we don't immediately re-seed when stream emits empty list
     _hasAttemptedInitialSeed = true; 
     
-    await _budgetService.deleteAllCategories(userId, ids);
+    await _budgetService.deleteAllCategories(ids);
     notifyListeners();
   }
 
-  Future<void> resetAllData(String userId) async {
+  Future<void> resetAllData() async {
     _isLoading = true;
     notifyListeners();
 
@@ -138,12 +158,12 @@ class TransactionProvider extends ChangeNotifier {
       final catIds = _categories.map((c) => c.id).toList();
 
       if (txIds.isNotEmpty) {
-        await _transactionService.deleteAllTransactions(userId, txIds);
+        await _transactionService.deleteAllTransactions(txIds);
       }
       
       if (catIds.isNotEmpty) {
         _hasAttemptedInitialSeed = true; // Prevent automatic re-seeding
-        await _budgetService.deleteAllCategories(userId, catIds);
+        await _budgetService.deleteAllCategories(catIds);
       }
     } finally {
       _isLoading = false;

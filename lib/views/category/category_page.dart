@@ -6,6 +6,7 @@ import '../../widgets/category_card.dart';
 import '../../models/Category.dart';
 import 'create_category_page.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/settings_provider.dart';
 
 class CategoryPage extends StatefulWidget {
   const CategoryPage({super.key});
@@ -56,7 +57,7 @@ class _CategoryPageState extends State<CategoryPage> {
 
     if (confirmed == true) {
       for (var id in _selectedIds) {
-        await provider.deleteCategory(userId, id);
+        await provider.deleteCategory(id);
       }
       setState(() {
         _selectedIds.clear();
@@ -85,7 +86,7 @@ class _CategoryPageState extends State<CategoryPage> {
       final userId = Provider.of<AuthProvider>(context, listen: false).user?.uid;
       if (userId == null) return;
 
-      await provider.deleteAllCategories(userId);
+      await provider.deleteAllCategories();
       
       setState(() {
         _selectedIds.clear();
@@ -97,6 +98,9 @@ class _CategoryPageState extends State<CategoryPage> {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<TransactionProvider>(context);
+    final settings = Provider.of<SettingsProvider>(context);
+    final bool hideBal = settings.hideBalances;
+
     final currentList = _filterType == null 
       ? provider.categories 
       : provider.categories.where((c) => c.type == _filterType).toList();
@@ -161,21 +165,21 @@ class _CategoryPageState extends State<CategoryPage> {
                   children: [
                     _StatCard(
                       title: 'Total Income',
-                      amount: '${provider.totalIncome.toStringAsFixed(2)} DT',
+                      amount: hideBal ? '•••• DT' : '${provider.totalIncome.toStringAsFixed(2)} DT',
                       icon: Icons.account_balance_wallet_outlined,
                       isPrimary: false,
                     ),
                     const SizedBox(width: 16),
                     _StatCard(
                       title: 'Total Expense',
-                      amount: '${provider.totalExpense.toStringAsFixed(2)} DT',
+                      amount: hideBal ? '•••• DT' : '${provider.totalExpense.toStringAsFixed(2)} DT',
                       icon: Icons.account_balance_wallet_outlined,
                       isPrimary: true,
                     ),
                     const SizedBox(width: 16),
                     _StatCard(
                       title: 'Balance',
-                      amount: '${provider.balance.toStringAsFixed(2)} DT',
+                      amount: hideBal ? '•••• DT' : '${provider.balance.toStringAsFixed(2)} DT',
                       icon: Icons.account_balance_wallet_outlined,
                       isPrimary: false,
                     ),
@@ -222,7 +226,7 @@ class _CategoryPageState extends State<CategoryPage> {
                     if (index == 0 && _filterType == null) isActive = true;
                     if (index == 1 && _filterType == CategoryType.income) isActive = true;
                     if (index == 2 && _filterType == CategoryType.expense) isActive = true;
-
+ 
                     return AnimatedContainer(
                       duration: const Duration(milliseconds: 350),
                       curve: Curves.easeOutBack,
@@ -296,7 +300,7 @@ class _CategoryPageState extends State<CategoryPage> {
                             return CategoryCard(
                               category: category,
                               subtitle: DateFormat('MMMM yyyy').format(DateTime.now()), 
-                              amount: categoryTotal,
+                              amount: hideBal ? -1 : categoryTotal, // Handle mask in card or pass -1
                               isSelectionMode: _isSelectionMode,
                               isSelected: _selectedIds.contains(category.id),
                               onTap: () {
@@ -323,10 +327,7 @@ class _CategoryPageState extends State<CategoryPage> {
                                 );
 
                                 if (confirmed == true) {
-                                  final userId = Provider.of<AuthProvider>(context, listen: false).user?.uid;
-                                  if (userId != null) {
-                                    await provider.deleteCategory(userId, category.id);
-                                  }
+                                  await provider.deleteCategory(category.id);
                                 }
                               },
                       );

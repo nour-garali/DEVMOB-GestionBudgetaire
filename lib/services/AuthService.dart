@@ -76,6 +76,16 @@ class AuthService {
     await _firestore.collection('users').doc(uid).update(data);
   }
 
+  // ─── Vérifier si l'email existe dans Firestore ──────────────────────────
+  Future<bool> isEmailRegistered(String email) async {
+    final result = await _firestore
+        .collection('users')
+        .where('email', isEqualTo: email.trim().toLowerCase())
+        .limit(1)
+        .get();
+    return result.docs.isNotEmpty;
+  }
+
   // ─── Réinitialisation de mot de passe ───────────────────────────────────
   Future<void> sendPasswordResetEmail(String email) async {
     await _auth.sendPasswordResetEmail(email: email);
